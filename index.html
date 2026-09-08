@@ -1030,68 +1030,95 @@ function flightTable(f){
 (function(){var el=document.getElementById('flightList');if(el)el.innerHTML=FLIGHTS.map(flightTable).join('');})();
 
 /* ==================== ACCOMMODATION DATA ==================== */
-/* roomGroups: 每一種房型展開成獨立房間；price = 該房單間總價（NT$），cap = 可住人數 */
+/* global currency helper (defined first so it's assigned before the immediate render calls below use it) */
+var DEFAULT_RATES={USD:32,EGP:0.66,CNY:4.4};
+function twdRate(cur){if(cur==='TWD')return 1;try{var r=JSON.parse(localStorage.getItem('rates')||'null')||DEFAULT_RATES;return +r[cur]||DEFAULT_RATES[cur]||0;}catch(e){return DEFAULT_RATES[cur]||0;}}
+function toTWDGlobal(amt,cur){return amt*twdRate(cur);}
+function fmtN(n){return Math.round(n).toLocaleString('en-US');}
+
+/* roomGroups: 每一種房型展開成獨立房間。
+   pp = 該房型每人固定分攤金額（NT$，不隨實際入住人數變動）。
+   stay.pp：若設定，代表整晚不分房型、每人一律用這個固定金額（覆蓋各房型的 pp）。
+   stay.ppFromUSD：{usd, n} 表示先用目前匯率把 usd 換成台幣，再除以 n 人，取得每人金額（會隨「旅費記帳」頁的匯率設定即時更新）。 */
 var STAYS=[
  {key:'malak',nights:'1/23（六）',city:'開羅市區',hotel:'開羅馬拉克宮殿飯店',en:'Malak Palace Cairo Hotel',area:'Downtown／Kasr Al Nile',
-  status:'confirmed',statusText:'已確認・8 間雙人房',price:'NT$15,000',per:'總價，約每人 1,000 元（依實際入住人數分攤）',
-  roomGroups:[{label:'雙人房',count:8,cap:2,price:1875}],
-  note:'已訂房 8 間雙人房，總金額 NT$15,000。'},
+  status:'confirmed',statusText:'已確認・8 間雙人房',price:'NT$15,000',pp:1000,
+  roomGroups:[{label:'雙人房',count:8,cap:2}],
+  note:'已訂房 8 間雙人房，總金額 NT$15,000，每人固定分攤 NT$1,000。'},
  {key:'desert2',nights:'1/24（日）',city:'巴哈利亞綠洲・白沙漠',hotel:'投票決定：沙漠露營 或 加價星空酒店',en:'',area:'白沙漠',
   status:'pending',statusText:'尚未表決',price:'—',per:'表決結果確定後補上房型與價格',roomGroups:null},
  {key:'sequoia',nights:'1/25（一）',city:'開羅・金字塔區',hotel:'SEQUOIA Pyramids View',en:'',area:'Giza',
-  status:'confirmed',statusText:'已確認 15 人',price:'US$541.05',per:'總團費，1/25 18:00 前可免費取消',
-  roomGroups:[{label:'家庭房（一大床＋三單人床）',count:1,cap:4,price:4593},
-              {label:'三人房',count:1,cap:3,price:3445},
-              {label:'雙人房',count:4,cap:2,price:2297}]},
+  status:'confirmed',statusText:'已確認 15 人',price:'US$541.05',pp:1149,
+  per:'1/25 18:00 前可免費取消',
+  roomGroups:[{label:'家庭房（一大床＋三單人床）',count:1,cap:4},
+              {label:'三人房',count:1,cap:3},
+              {label:'雙人房',count:4,cap:2}]},
  {key:'arokato',nights:'1/26（二）',city:'阿斯旺',hotel:'Aro Kato Nubian Guest House',en:'',area:'努比亞村',
-  status:'confirmed',statusText:'已確認 15 人',price:'US$805.18',per:'總團費，1/23 前可免費取消',
-  roomGroups:[{label:'三人房',count:2,cap:3,price:5601},
-              {label:'雙人房 A',count:4,cap:2,price:4152},
-              {label:'雙人房 B',count:1,cap:2,price:3552}]},
+  status:'confirmed',statusText:'已確認 15 人',price:'US$805.18',ppFromUSD:{usd:805.18,n:15},
+  per:'總團費 US$805.18 ÷ 15 人（依即時匯率換算），1/23 前可免費取消',
+  roomGroups:[{label:'三人房',count:2,cap:3},
+              {label:'雙人房 A',count:4,cap:2},
+              {label:'雙人房 B',count:1,cap:2}]},
  {key:'abusimbel',nights:'1/27（三）',city:'阿布辛貝',hotel:'New Abu Simbel Tourist Hotel',en:'',area:'Abu Simbel',
-  status:'confirmed',statusText:'已確認 15 人',price:'¥6,321.82',per:'人民幣 / 總團費（約 NT$24,595）',
-  roomGroups:[{label:'雙人房',count:8,cap:2,price:3280}]},
+  status:'confirmed',statusText:'已確認 15 人',price:'¥6,321.82',pp:1990,
+  roomGroups:[{label:'雙人房',count:8,cap:2}]},
  {key:'sarayelomda',nights:'1/28（四）',city:'盧克索',hotel:'Saray El Omda - Egyptian Rural Village',en:'',area:'尼羅河西岸',
-  status:'confirmed',statusText:'已確認 15 人',price:'US$721.25',per:'總團費，1/22 前可免費取消',
-  roomGroups:[{label:'雙臥室公寓（雙人床×1＋單人床×2）',count:4,cap:4,price:7249}]},
+  status:'confirmed',statusText:'已確認 15 人',price:'US$721.25',pp:1682,
+  per:'1/22 前可免費取消',
+  roomGroups:[{label:'雙臥室公寓（雙人床×1＋單人床×2）',count:4,cap:4}]},
  {key:'hilton',nights:'1/29（五）',city:'紅海（全包飯店）',hotel:'Hilton Hurghada Plaza',en:'',area:'Hurghada',
-  status:'confirmed',statusText:'全包方案',price:'NT$45,302',per:'總團費，約每人 3,020 元，1/24 前可免費取消',
-  roomGroups:[{label:'雙臥室房型（雙人床房＋兩張單人床房）',count:4,cap:4,price:11326}]},
+  status:'confirmed',statusText:'全包方案',price:'NT$45,302',pp:2960,
+  per:'1/24 前可免費取消，全包含早／午／晚餐＋飲料',
+  roomGroups:[{label:'雙臥室房型（雙人床房＋兩張單人床房）',count:4,cap:4}]},
  {key:'voco',nights:'1/30（六）',city:'開羅',hotel:'VOCO Cairo Arabella Plaza',en:'',area:'Arabella Plaza Mall 內',
   status:'confirmed',statusText:'已確認 15 人',price:'US$1,545.53',per:'總團費',
-  roomGroups:[{label:'雙人房',count:6,cap:2,price:4613},
-              {label:'三人房',count:1,cap:3,price:7878}]}
+  roomGroups:[{label:'雙人房',count:6,cap:2,pp:2306},
+              {label:'三人房',count:1,cap:3,pp:2626}]}
 ];
 
 function stayCard(s){
   var note=s.note?'<div class="rec">'+ms('info')+'<span>'+s.note+'</span></div>':'';
   var picker=s.roomGroups?'<div class="room-pick" data-stay="'+s.key+'"></div>':'';
+  var perText='<span class="stay-per-dyn" data-stay-per="'+s.key+'">'+stayPerText(s)+'</span>';
   return '<div class="stay-card"><div class="stay-top"><div>'+
     '<div class="stay-nights">'+s.nights+'</div>'+
     '<div class="stay-name">'+s.hotel+(s.en?'<span class="en">'+s.en+'</span>':'')+'</div>'+
     '<div class="stay-area">'+ms('place')+s.city+(s.area?'・'+s.area:'')+'</div>'+
     '<span class="stay-status '+s.status+'">'+s.statusText+'</span></div>'+
-    (s.price?'<div class="stay-price"><div class="stay-amt">'+s.price+'</div><div class="stay-per">'+s.per+'</div></div>':'<div class="stay-price"><div class="stay-per">'+s.per+'</div></div>')+
+    (s.price?'<div class="stay-price"><div class="stay-amt">'+s.price+'</div><div class="stay-per">'+perText+'</div></div>':'<div class="stay-price"><div class="stay-per">'+perText+'</div></div>')+
     '</div>'+note+picker+'</div>';
 }
 (function(){var el=document.getElementById('stayList');if(el)el.innerHTML=STAYS.map(stayCard).join('');})();
 
-/* ---- room picker: live occupancy backed by the same votes table (topic='room-<stayKey>', choice=roomInstanceId) ---- */
+/* ---- room picker: live occupancy backed by the same votes table (topic='room-<stayKey>', choice=roomInstanceId) ----
+   每人分攤金額一律用「固定金額」（stay.pp／room.pp／stay.ppFromUSD），不隨實際入住人數重新分配。 */
+function resolvePP(s,room){
+  if(room&&room.pp!=null)return room.pp;
+  if(s.pp!=null)return s.pp;
+  if(s.ppFromUSD)return toTWDGlobal(s.ppFromUSD.usd,'USD')/s.ppFromUSD.n;
+  if(room&&room.price&&room.cap)return room.price/room.cap; // legacy fallback
+  return 0;
+}
+function stayPerText(s){
+  if(s.ppFromUSD){var v=toTWDGlobal(s.ppFromUSD.usd,'USD')/s.ppFromUSD.n;return '每人固定 NT$'+fmtN(v)+(s.per?'・'+s.per:'');}
+  if(s.pp!=null)return '每人固定 NT$'+fmtN(s.pp)+(s.per?'・'+s.per:'');
+  return s.per||'';
+}
 function roomInstances(s){
   var list=[];
-  (s.roomGroups||[]).forEach(function(g,gi){for(var i=1;i<=g.count;i++)list.push({gi:gi,idx:i,id:'g'+gi+'-r'+i,label:g.label+' '+i,cap:g.cap,price:g.price});});
+  (s.roomGroups||[]).forEach(function(g,gi){for(var i=1;i<=g.count;i++)list.push({gi:gi,idx:i,id:'g'+gi+'-r'+i,label:g.label+' '+i,cap:g.cap,pp:g.pp});});
   return list;
 }
 function roomSlotHTML(s,room,occupants){
   var full=occupants.length>=room.cap;
-  var share=occupants.length?Math.round(room.price/occupants.length):room.price;
+  var pp=resolvePP(s,room);
   var seats=occupants.map(function(n){var mine=n===ME;
-    return '<div class="rs-seat'+(mine?' me':'')+'"><span class="nm">'+esc(n)+'</span><span class="amt">NT$'+share.toLocaleString()+'</span>'+
+    return '<div class="rs-seat'+(mine?' me':'')+'"><span class="nm">'+esc(n)+'</span><span class="amt">NT$'+fmtN(pp)+'</span>'+
       (mine?'<button class="rs-leave" data-topic="room-'+s.key+'" title="離開這間">'+ms('close')+'</button>':'')+'</div>';}).join('');
   var iAmHere=occupants.indexOf(ME)>-1;
   var action=iAmHere?'':(full?'<span class="rs-full">已滿</span>':
     '<button class="rs-join" data-topic="room-'+s.key+'" data-choice="'+room.id+'">'+ms('add')+'加入（尚有 '+(room.cap-occupants.length)+' 位空床）</button>');
-  return '<div class="room-slot"><div class="rs-head"><span class="rs-label">'+room.label+'</span><span class="rs-price">NT$'+room.price.toLocaleString()+' / 房・每床約 NT$'+Math.round(room.price/room.cap).toLocaleString()+'</span></div>'+
+  return '<div class="room-slot"><div class="rs-head"><span class="rs-label">'+room.label+'</span><span class="rs-price">每人固定 NT$'+fmtN(pp)+'</span></div>'+
     '<div class="rs-seats">'+seats+'</div>'+action+'</div>';
 }
 function refreshRoomPicks(){
@@ -1102,7 +1129,9 @@ function refreshRoomPicks(){
     Object.keys(vv).forEach(function(voter){var c=vv[voter];if(!c)return;(occ[c]=occ[c]||[]).push(voter);});
     box.innerHTML=roomInstances(s).map(function(r){return roomSlotHTML(s,r,occ[r.id]||[]);}).join('');
   });
+  document.querySelectorAll('.stay-per-dyn').forEach(function(el){var key=el.getAttribute('data-stay-per'),s=STAYS.filter(function(x){return x.key===key;})[0];if(s)el.textContent=stayPerText(s);});
   renderStayShares();
+  if(window.renderPersonal)window.renderPersonal();
 }
 document.addEventListener('click',function(e){
   var j=e.target.closest('.rs-join');
@@ -1111,7 +1140,7 @@ document.addEventListener('click',function(e){
   if(l){l.disabled=true;dbVoteSet(l.getAttribute('data-topic'),'').then(refreshRoomPicks);return;}
 });
 
-/* ---- auto accommodation cost per person → feeds Expense page ---- */
+/* ---- auto accommodation cost per person（固定金額加總）→ 同時餵給「旅費記帳」頁 ---- */
 function computeStayShares(){
   var totals={};
   STAYS.forEach(function(s){
@@ -1120,7 +1149,7 @@ function computeStayShares(){
     Object.keys(vv).forEach(function(voter){var c=vv[voter];if(!c)return;(occ[c]=occ[c]||[]).push(voter);});
     roomInstances(s).forEach(function(r){
       var people=occ[r.id]||[];if(!people.length)return;
-      var share=r.price/people.length;
+      var share=resolvePP(s,r); // 固定金額，不管這間房實際住了幾人
       people.forEach(function(n){totals[n]=(totals[n]||0)+share;});
     });
   });
@@ -1131,10 +1160,11 @@ function renderStayShares(){
   var totals=computeStayShares(),names=Object.keys(totals);
   if(!names.length){box.innerHTML='';return;}
   var grand=names.reduce(function(a,n){return a+totals[n];},0);
-  box.innerHTML='<div class="settle"><h3>'+ms('hotel')+'住宿費分攤（依「住宿及航班資訊」頁的房間選擇即時計算）</h3>'+
-    '<div class="per">'+names.map(function(n){return '<div class="p"><div class="nm">'+esc(n)+'</div><div class="st">住宿分攤</div><div class="net">NT$'+Math.round(totals[n]).toLocaleString()+'</div></div>';}).join('')+
-    '</div><p class="tiny">住宿分攤總額：NT$'+Math.round(grand).toLocaleString()+'（此區塊會隨大家在「住宿及航班資訊」頁面選房自動更新，不需手動新增支出）</p></div>';
+  box.innerHTML='<div class="settle"><h3>'+ms('hotel')+'住宿費分攤（每人固定金額，依「住宿及航班資訊」頁的房間選擇即時計算）</h3>'+
+    '<div class="per">'+names.map(function(n){return '<div class="p"><div class="nm">'+esc(n)+'</div><div class="st">個人住宿分攤</div><div class="net">NT$'+fmtN(totals[n])+'</div></div>';}).join('')+
+    '</div><p class="tiny">已登記房間的人數：'+names.length+' 人・全部人加總僅供對帳參考：NT$'+fmtN(grand)+'（此區塊會隨大家在「住宿及航班資訊」頁面選房自動更新，且已自動併入下方「我的支出總覽」，不需手動新增支出）</p></div>';
 }
+
 
 
 /* build plan tabs + panels */
@@ -1362,10 +1392,12 @@ document.addEventListener('click',function(e){var op=e.target.closest('.vopt');i
    var mine=CACHE.expenses.filter(function(e){return isPersonal(e)&&e.payer===ME;});
    var personalTotal=0;mine.forEach(function(e){personalTotal+=toTWD(+e.amount,e.cur);});
    var owe=myShareOwe();
+   var stayShare=(window.computeStayShares?(computeStayShares()[ME]||0):0);
    sum.innerHTML='<div class="settle"><h3>'+ms('account_balance_wallet')+'我的支出總覽（'+esc(ME)+'）</h3><div class="per">'+
      '<div class="p"><div class="nm">個人支出小計</div><div class="net">NT$'+fmt(personalTotal)+'</div></div>'+
      '<div class="p"><div class="nm">共同支出中我的分攤</div><div class="net">NT$'+fmt(owe)+'</div></div>'+
-     '<div class="p"><div class="nm">總支出（個人＋共同分攤）</div><div class="net pos">NT$'+fmt(personalTotal+owe)+'</div></div>'+
+     '<div class="p"><div class="nm">住宿費分攤（依選房）</div><div class="net">NT$'+fmt(stayShare)+'</div></div>'+
+     '<div class="p"><div class="nm">總支出（個人＋共同分攤＋住宿）</div><div class="net pos">NT$'+fmt(personalTotal+owe+stayShare)+'</div></div>'+
      '</div></div>';
    if(!mine.length){box.innerHTML='<div class="exp-empty">還沒有個人支出，用上方表單新增第一筆吧！</div>';return;}
    box.innerHTML=mine.slice().reverse().map(function(e){var tw=toTWD(+e.amount,e.cur);
@@ -1394,6 +1426,7 @@ document.addEventListener('click',function(e){var op=e.target.closest('.vopt');i
      pAdd.disabled=false;document.getElementById('pDesc').value='';document.getElementById('pAmt').value='';renderPersonal();});
  });
  window.paintExpense=renderExpense;
+ window.renderPersonal=renderPersonal;
  window.renderExpense=function(){if(CLOUD_ON){dbExpLoad().then(function(){dbMembersLoad().then(renderExpense);});}else renderExpense();};
  renderExpense();
 })();
